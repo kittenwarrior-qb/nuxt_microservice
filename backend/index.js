@@ -91,37 +91,37 @@ broker.loadServices(path.join(__dirname, "services"), "**/*.service.js");
 // Start broker
 broker.start()
   .then(() => {
-    broker.logger.info("✅ Moleculer broker started successfully");
-    broker.logger.info(`🚀 API Gateway: http://localhost:${process.env.PORT || 3000}`);
+    broker.logger.info("Moleculer broker started successfully");
+    broker.logger.info(`API Gateway: http://localhost:${process.env.PORT || 3000}`);
   })
   .catch(err => {
-    broker.logger.error("❌ Failed to start broker:", err);
+    broker.logger.error("Failed to start broker:", err);
     process.exit(1);
   });
 
 // Graceful shutdown
 process.on("SIGINT", () => {
-  broker.logger.info("🛑 Shutting down gracefully...");
+  broker.logger.info("Shutting down gracefully...");
   broker.stop()
     .then(() => {
-      broker.logger.info("✅ Broker stopped successfully");
+      broker.logger.info("Broker stopped successfully");
       process.exit(0);
     })
     .catch(err => {
-      broker.logger.error("❌ Error during shutdown:", err);
+      broker.logger.error("Error during shutdown:", err);
       process.exit(1);
     });
 });
 
 process.on("SIGTERM", () => {
-  broker.logger.info("🛑 Received SIGTERM, shutting down...");
+  broker.logger.info("Received SIGTERM, shutting down...");
   broker.stop()
     .then(() => {
-      broker.logger.info("✅ Broker stopped successfully");
+      broker.logger.info("Broker stopped successfully");
       process.exit(0);
     })
     .catch(err => {
-      broker.logger.error("❌ Error during shutdown:", err);
+      broker.logger.error("Error during shutdown:", err);
       process.exit(1);
     });
 });

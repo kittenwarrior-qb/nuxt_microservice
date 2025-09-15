@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 module.exports = {
-  namespace: "thegioididong",
+  namespace: "tgdd",
   nodeID: null,
   
   logger: {
