@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   FacebookAuthProvider,
+  GithubAuthProvider,
   updateProfile,
   getAuth,
   signOut,
@@ -255,6 +256,27 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async signInWithGithub() {
+      this.loading = true
+      this.error = null
+
+      try {
+        const $auth = this.getAuthInstance()
+        const provider = new GithubAuthProvider()
+        provider.addScope('user:email')
+        
+        const userCredential = await signInWithPopup($auth as any, provider)
+        await this.syncWithBackend(userCredential.user)
+        
+        return userCredential.user
+      } catch (error: any) {
+        this.error = this.getErrorMessage(error)
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async logout() {
       this.loading = true
       
@@ -297,7 +319,8 @@ export const useAuthStore = defineStore('auth', {
         'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
         'auth/popup-closed-by-user': 'Sign-in popup was closed before completion.',
         'auth/cancelled-popup-request': 'Sign-in was cancelled.',
-        'auth/popup-blocked': 'Sign-in popup was blocked by the browser.'
+        'auth/popup-blocked': 'Sign-in popup was blocked by the browser.',
+        'auth/account-exists-with-different-credential': 'An account already exists with the same email address but different sign-in credentials.'
       }
 
       const err = error as any

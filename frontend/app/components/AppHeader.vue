@@ -44,7 +44,7 @@
             <!-- User Actions -->
             <div class="flex items-center gap-2">
               <NuxtLink
-                v-if="!user"
+                v-if="!isAuthenticated"
                 to="/login"
                 class="flex items-center gap-1 cursor-pointer hover:bg-[#ffee99] rounded-full py-2 px-2 transition-all duration-300"
               >
@@ -62,21 +62,43 @@
 
               <div
                 v-else
-                class="flex items-center gap-1 cursor-pointer hover:bg-[#ffee99] rounded-full py-2 px-2 transition-all duration-300"
+                class="relative flex items-center gap-2 rounded-full py-2 px-2 transition-all duration-300"
               >
-                <img src = "/icons/user_icon.png" width="17" height="17" alt="user" class="w-6 h-6">
-                <span
-                  v-show="!isSticky"
-                  class="text-sm hidden md:block transition-all duration-300"
+                <!-- Toggle user menu from icon; username hidden when sticky -->
+                <button
+                  class="flex items-center gap-2 hover:bg-[#ffee99] rounded-full py-1 px-2"
+                  @click.stop="userMenuOpen = !userMenuOpen"
                 >
-                  {{ user.username }}
-                </span>
+                  <img src="/icons/user_icon.png" width="17" height="17" alt="user" class="w-6 h-6">
+                  <span
+                    class="text-sm hidden md:block transition-all duration-300"
+                  >
+                    {{ displayName }}
+                  </span>
+                </button>
+
+                <!-- Dropdown Menu -->
+                <div
+                  v-if="userMenuOpen"
+                  class="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50"
+                  @click.stop
+                >
+                  <div class="px-3 py-2 text-sm text-gray-700 border-b border-gray-100 truncate">
+                    {{ displayName }}
+                  </div>
+                  <button
+                    class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                    @click="handleLogout"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
               </div>
 
-              <!-- <NuxtLink
+              <NuxtLink
                 to="/cart"
                 class="relative flex items-center gap-1 cursor-pointer hover:bg-[#ffee99] rounded-full py-2 px-2 transition-all duration-300"
-              > -->
+              >
                 <img 
                   src="/icons/cart_icon.png" 
                   alt="cart" 
@@ -95,7 +117,7 @@
                 >
                   {{ cartQuantity }}
                 </span>
-              <!-- </NuxtLink> -->
+              </NuxtLink>
             </div>
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
@@ -126,7 +148,7 @@
                 </button>
                 
                 <NuxtLink
-                  v-if="!user"
+                  v-if="!isAuthenticated"
                   to="/login"
                   class="flex items-center gap-1 cursor-pointer hover:bg-[#ffee99] rounded-full py-1 px-2 transition-all duration-300"
                 >
@@ -135,9 +157,15 @@
                 
                 <div
                   v-else
-                  class="flex items-center gap-1 cursor-pointer hover:bg-[#ffee99] rounded-full py-1 px-2 transition-all duration-300"
+                  class="flex items-center gap-2 hover:bg-[#ffee99] rounded-full py-1 px-2 transition-all duration-300"
                 >
                   <img src="/icons/user_icon.png" width="20" height="20" alt="user" class="w-5 h-5">
+                  <button
+                    class="text-xs text-blue-700 hover:underline"
+                    @click="handleLogout"
+                  >
+                    Đăng xuất
+                  </button>
                 </div>
               </div>
             </div>
@@ -281,16 +309,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
+import { navigateTo } from 'nuxt/app'
+import { useAuthStore } from "../../stores/auth";
+import { storeToRefs } from 'pinia'
+
+const authStore = useAuthStore()
+const { isAuthenticated, userDisplayName } = storeToRefs(authStore)
 
 const searchQuery = ref("");
 const activeCategory = ref<number | null>(null);
 const showLocationModal = ref(false);
 const cartQuantity = ref(0);
-const user = ref<{ username?: string } | null>(null);
+const displayName = computed(() => userDisplayName.value)
 const isSticky = ref(false);
 const stickyHeaderHeight = ref(0);
 const currentSlide = ref(0);
+const userMenuOpen = ref(false);
 
 
 const categories = [
@@ -362,12 +397,18 @@ const handleSearch = () => {
   }
 };
 
-// const _handleLogout = () => {
-//   user.value = null;
-// };
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    await navigateTo('/login')
+  } catch {
+    // no-op; errors are handled in the store
+  }
+}
 
 const closeDropdowns = () => {
   activeCategory.value = null;
+  userMenuOpen.value = false;
 };
 
 // Scroll handler with throttling for performance

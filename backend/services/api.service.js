@@ -2,6 +2,7 @@ const ApiGateway = require("moleculer-web");
 const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
+const swaggerSpec = require("../swagger.config");
 
 module.exports = {
   name: "api",
@@ -12,21 +13,7 @@ module.exports = {
     port: process.env.PORT || 3001,
     ip: "0.0.0.0",
     
-    use: [
-      helmet({
-        contentSecurityPolicy: false,
-        crossOriginEmbedderPolicy: false
-      }),
-      cors({
-        origin: process.env.CORS_ORIGIN || "*",
-        credentials: process.env.CORS_CREDENTIALS === "true"
-      }),
-      rateLimit({
-        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-        max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-        message: "Too many requests from this IP, please try again later."
-      })
-    ],
+    use: [],
     
     routes: [
       {
@@ -38,12 +25,43 @@ module.exports = {
             res.end(JSON.stringify({
               message: "TheGioiDiDong API Server",
               version: "1.0.0",
+              documentation: "/docs",
               endpoints: {
                 products: "/api/v1/products",
                 categories: "/api/v1/categories",
                 health: "/api/v1/health"
               }
             }));
+          },
+          "GET /docs": (req, res) => {
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>TheGioiDiDong API Documentation</title>
+                <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+              </head>
+              <body>
+                <div id="swagger-ui"></div>
+                <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+                <script>
+                  SwaggerUIBundle({
+                    url: '/api-docs.json',
+                    dom_id: '#swagger-ui',
+                    presets: [
+                      SwaggerUIBundle.presets.apis,
+                      SwaggerUIBundle.presets.standalone
+                    ]
+                  });
+                </script>
+              </body>
+              </html>
+            `);
+          },
+          "GET /api-docs.json": (req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(swaggerSpec));
           }
         }
       },
@@ -60,7 +78,14 @@ module.exports = {
           "orders.*"
         ],
         
-        use: [],
+        use: [
+          cors({
+            origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+            credentials: process.env.CORS_CREDENTIALS === "true",
+            methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+          })
+        ],
         
         mergeParams: true,
         

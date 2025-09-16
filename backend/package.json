@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "node index.js",
-    "dev:moleculer": "moleculer-runner --repl --hot services/**/*.service.js", 
+    "dev:moleculer": "moleculer-runner --repl --hot services/**/*.service.js",
     "start": "node index.js",
     "cli": "moleculer connect NATS",
     "test": "jest",
@@ -42,7 +42,9 @@
     "nats": "^2.29.3",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.32.1"
+    "sequelize": "^6.32.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
