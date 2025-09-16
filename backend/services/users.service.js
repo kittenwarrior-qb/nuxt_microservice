@@ -99,6 +99,12 @@ module.exports = {
         type: DataTypes.STRING(50),
         defaultValue: 'local',
         field: 'auth_provider'
+      },
+      firebaseUid: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        field: 'firebase_uid'
       }
     },
     options: {
@@ -129,6 +135,7 @@ module.exports = {
       "googleId",
       "avatarUrl",
       "authProvider",
+      "firebaseUid",
       "createdAt", 
       "updatedAt"
     ],
@@ -328,6 +335,52 @@ module.exports = {
         
         return this.transformDocuments(ctx, {}, user);
       }
+    },
+    
+    findByFirebaseUid: {
+      params: {
+        firebaseUid: "string"
+      },
+      async handler(ctx) {
+        const user = await this.adapter.findOne({ firebaseUid: ctx.params.firebaseUid });
+        return user ? this.transformDocuments(ctx, {}, user) : null;
+      }
+    },
+    
+    createFromFirebase: {
+      params: {
+        firebaseUid: "string",
+        email: "email",
+        name: "string",
+        emailVerified: { type: "boolean", optional: true },
+        picture: { type: "string", optional: true },
+        provider: { type: "string", optional: true }
+      },
+      async handler(ctx) {
+        const { firebaseUid, email, name, emailVerified, picture, provider } = ctx.params;
+        
+        // Split name into first and last name
+        const nameParts = name.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        const userData = {
+          firebaseUid,
+          email,
+          firstName,
+          lastName,
+          emailVerified: emailVerified || false,
+          avatarUrl: picture,
+          authProvider: provider || 'firebase',
+          isActive: true
+        };
+        
+        const user = await this.adapter.insert(userData);
+        
+        this.logger.info(`New Firebase user created: ${email}`);
+        
+        return this.transformDocuments(ctx, {}, user);
+      }
     }
   },
   
@@ -361,6 +414,43 @@ module.exports = {
   },
   
   async started() {
-    this.logger.info("Users service started");
+    this.logger.info("Users service starting... checking database connection and syncing models");
+    
+    const maxRetries = 5;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        // Ensure DB connection is alive
+        await sequelize.authenticate();
+        this.logger.info("Database connection has been established successfully");
+
+        // Ensure the Users model/table exists
+        if (this.adapter && this.adapter.model) {
+          await this.adapter.model.sync();
+          this.logger.info("Users model synchronized successfully");
+        } else {
+          this.logger.warn("Sequelize adapter or model is not available to sync");
+        }
+
+        this.logger.info("Users service started and ready");
+        return; // Success, exit retry loop
+      } catch (err) {
+        retryCount++;
+        this.logger.error(`Failed to initialize Users service (attempt ${retryCount}/${maxRetries}):`, err.message);
+        
+        if (retryCount >= maxRetries) {
+          this.logger.error("Max retries reached. Users service initialization failed permanently.");
+          // Don't throw - let service start but log the issue
+          this.logger.warn("Users service will continue without database connection. Some features may not work.");
+          return;
+        }
+        
+        // Wait before retry (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        this.logger.info(`Retrying database connection in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
 };

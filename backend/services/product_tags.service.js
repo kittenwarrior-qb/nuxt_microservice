@@ -1,7 +1,7 @@
 const { ServiceBroker } = require("moleculer");
 const DbService = require("moleculer-db");
 const SequelizeAdapter = require("moleculer-db-adapter-sequelize");
-const { DataTypes } = require("sequelize");
+const { DataTypes, Op } = require("sequelize");
 const sequelize = require("../config/database");
 
 module.exports = {

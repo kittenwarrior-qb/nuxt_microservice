@@ -10,13 +10,35 @@ module.exports = {
   
   adapter: new SequelizeAdapter(sequelize),
   
+  // Add a dummy model to satisfy moleculer-db requirements
+  model: {
+    name: "database_health",
+    define: {
+      id: {
+        type: require("sequelize").DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+      },
+      status: {
+        type: require("sequelize").DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "healthy"
+      }
+    },
+    options: {
+      timestamps: true,
+      underscored: true,
+      tableName: 'database_health'
+    }
+  },
+  
   settings: {
     idField: "id",
     pageSize: 10,
     maxPageSize: 100,
     maxLimit: -1,
     
-    fields: ["id", "created_at", "updated_at"],
+    fields: ["id", "status", "created_at", "updated_at"],
     
     defaultScopes: [],
     
@@ -131,19 +153,8 @@ module.exports = {
     
     async createIndexes() {
       // Create additional indexes if needed
-      this.logger.info("Creating additional database indexes...");
-      
-      try {
-        // Example: Create text search indexes
-        await this.adapter.db.query(`
-          CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_search 
-          ON catalog.products USING gin(to_tsvector('english', name || ' ' || COALESCE(description, '')))
-        `);
-        
-        this.logger.info("Additional indexes created successfully");
-      } catch (error) {
-        this.logger.warn("Failed to create some indexes:", error.message);
-      }
+      this.logger.info("Skipping additional database indexes for now");
+      // Disabled problematic index creation that references non-existent catalog.products table
     }
   },
   

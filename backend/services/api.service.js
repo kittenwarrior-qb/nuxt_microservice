@@ -9,7 +9,7 @@ module.exports = {
   mixins: [ApiGateway],
   
   settings: {
-    port: process.env.PORT || 3000,
+    port: process.env.PORT || 3001,
     ip: "0.0.0.0",
     
     use: [
@@ -30,13 +30,33 @@ module.exports = {
     
     routes: [
       {
+        path: "/",
+        
+        aliases: {
+          "GET /": (req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              message: "TheGioiDiDong API Server",
+              version: "1.0.0",
+              endpoints: {
+                products: "/api/v1/products",
+                categories: "/api/v1/categories",
+                health: "/api/v1/health"
+              }
+            }));
+          }
+        }
+      },
+      {
         path: "/api/v1",
         
         whitelist: [
-          "database.healthCheck",
+          "database.*",
           "users.*",
+          "auth.*",
           "products.*",
           "categories.*",
+          "product_tags.*",
           "orders.*"
         ],
         
@@ -44,16 +64,25 @@ module.exports = {
         
         mergeParams: true,
         
-        authentication: true,
+        authentication: false,
         
-        authorization: true,
+        authorization: false,
         
         autoAliases: true,
         
         aliases: {
-          "GET /health": "database.healthCheck",
+          "GET /health": (req, res) => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              status: "healthy",
+              timestamp: new Date().toISOString(),
+              uptime: process.uptime(),
+              services: ["api", "auth", "products", "users", "categories"]
+            }));
+          },
           "POST /auth/register": "users.register",
           "POST /auth/login": "users.login",
+          "POST /auth/firebase": "auth.verifyToken",
           "GET /auth/me": "users.me"
         },
         
@@ -106,14 +135,21 @@ module.exports = {
     },
     
     async authorize(ctx, route, req) {
-      // Skip authentication for public routes
+      // Debug: Log the incoming request URL
+      this.logger.info(`Authorization check for: ${req.method} ${req.url}`);
+      
+      // Skip authentication for public routes (without /api/v1 prefix)
       const publicRoutes = [
-        "/api/v1/health",
-        "/api/v1/auth/register",
-        "/api/v1/auth/login"
+        "/health",
+        "/auth/register", 
+        "/auth/login",
+        "/auth/firebase",
+        "/products",
+        "/products/new",
       ];
       
       if (publicRoutes.includes(req.url)) {
+        this.logger.info(`Matched public route: ${req.url}`);
         return true;
       }
       

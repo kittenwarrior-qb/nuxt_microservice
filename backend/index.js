@@ -86,13 +86,17 @@ const broker = new ServiceBroker({
 });
 
 // Load services
-broker.loadServices(path.join(__dirname, "services"), "**/*.service.js");
+broker.loadService(path.join(__dirname, "services", "api.service.js"));
+broker.loadService(path.join(__dirname, "services", "auth.service.js"));
+broker.loadService(path.join(__dirname, "services", "products.service.js"));
+broker.loadService(path.join(__dirname, "services", "users.service.js"));
+broker.loadService(path.join(__dirname, "services", "categories.service.js"));
 
 // Start broker
 broker.start()
   .then(() => {
     broker.logger.info("Moleculer broker started successfully");
-    broker.logger.info(`API Gateway: http://localhost:${process.env.PORT || 3000}`);
+    broker.logger.info(`API Gateway: http://localhost:${process.env.PORT || 3001}`);
   })
   .catch(err => {
     broker.logger.error("Failed to start broker:", err);

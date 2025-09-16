@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 module.exports = {
-  namespace: "tgdd",
+  namespace: "thegioididong-local",
   nodeID: null,
   
   logger: {
@@ -17,7 +17,8 @@ module.exports = {
   
   logLevel: process.env.LOGLEVEL || "info",
   
-  transporter: process.env.TRANSPORTER || "TCP",
+  // Run as a standalone node to avoid connecting to any stale nodes
+  transporter: null,
   
   cacher: process.env.CACHER || "Memory",
   
@@ -109,3 +110,4 @@ module.exports = {
     // Fired when the broker stopped
   }
 };
+
