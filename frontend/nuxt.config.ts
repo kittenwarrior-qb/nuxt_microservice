@@ -16,8 +16,6 @@ export default defineNuxtConfig({
     }
   },
   
-  // css: ['~/assets/css/main.css'], // Moved to app.vue
-  
   typescript: {
     typeCheck: true
   },

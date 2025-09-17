@@ -1,6 +1,6 @@
 <template>
-  <!-- <NuxtLink :to="`/detail/${product.id}`"> -->
-    <div class="relative rounded-lg border border-gray-200 bg-white ">
+  <NuxtLink :to="`/detail/${product.id}`" class="block">
+    <div class="relative rounded-lg border border-gray-200 bg-white hover:shadow-lg transition-shadow duration-200">
       <div class="relative">
         <img
           :alt="product.name || ''"
@@ -71,7 +71,7 @@
         </div>
       </div>
     </div>
-  <!-- </NuxtLink> -->
+  </NuxtLink>
 </template>
 
 <script setup lang="ts">
@@ -98,14 +98,45 @@ const showNewTag = computed(() => !!(props.product.isNew || props.product.is_new
 
 const isOnline = computed(() => !!(props.product.isOnline || props.product.is_online))
 
-const formatPrice = (price: string | undefined) => {
+const formatPrice = (price: string | number | undefined) => {
   if (!price) return ''
-  // Normalize: remove currency and separators except digits and dots/commas
-  const cleaned = String(price).replace(/[^\d.,]/g, '')
-  // Prefer dot as decimal, remove thousand separators
-  const normalized = cleaned.replace(/\./g, '').replace(/,(\d{1,2})$/, '.$1')
-  const num = parseFloat(normalized)
-  return isNaN(num) ? String(price) : num.toLocaleString('vi-VN') + 'đ'
+  
+  let numPrice: number = 0
+  if (typeof price === 'string') {
+    // Remove currency symbols and spaces first
+    let cleanPrice = price.replace(/[đ₫\s]/g, '')
+    
+    // Check if the string contains dots (Vietnamese thousand separators)
+    if (cleanPrice.includes('.')) {
+      // Count dots to determine format
+      const dotCount = (cleanPrice.match(/\./g) || []).length
+      
+      if (dotCount >= 2) {
+        // Multiple dots = Vietnamese format (e.g., "20.190.000")
+        cleanPrice = cleanPrice.replace(/\./g, '')
+        numPrice = parseInt(cleanPrice, 10)
+      } else {
+        // Single dot might be decimal point, check position
+        const parts = cleanPrice.split('.')
+        if (parts[1] && parts[1].length <= 2) {
+          // Likely decimal (e.g., "20.50")
+          numPrice = parseFloat(cleanPrice)
+        } else {
+          // Likely thousand separator (e.g., "20.190")
+          cleanPrice = cleanPrice.replace(/\./g, '')
+          numPrice = parseInt(cleanPrice, 10)
+        }
+      }
+    } else {
+      // No dots, remove commas and parse
+      cleanPrice = cleanPrice.replace(/,/g, '')
+      numPrice = parseInt(cleanPrice, 10)
+    }
+  } else {
+    numPrice = price
+  }
+  
+  return isNaN(numPrice) ? String(price) : numPrice.toLocaleString('vi-VN') + 'đ'
 }
 
 const flashSaleData = computed(() => {

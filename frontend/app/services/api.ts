@@ -8,7 +8,6 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // Ensure we use absolute URL to avoid Vue Router interference
     const url = this.baseURL.startsWith('http') 
       ? `${this.baseURL}${endpoint}`
       : `http://localhost:3001/api/v1${endpoint}`

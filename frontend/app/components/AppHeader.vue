@@ -112,7 +112,7 @@
                 <span
                   v-if="cartQuantity > 0"
                   :class="[
-                    'absolute bg-red-500 text-white text-xs rounded-full flex items-center justify-center transition-all duration-300',
+                    'absolute left-[14px] top-[-9] px-1 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center transition-all duration-300',
                   ]"
                 >
                   {{ cartQuantity }}
@@ -311,7 +311,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { navigateTo } from 'nuxt/app'
-import { useAuthStore } from "../../stores/auth";
+import { useAuthStore } from "../stores/auth";
 import { storeToRefs } from 'pinia'
 
 const authStore = useAuthStore()
@@ -320,7 +320,8 @@ const { isAuthenticated, userDisplayName } = storeToRefs(authStore)
 const searchQuery = ref("");
 const activeCategory = ref<number | null>(null);
 const showLocationModal = ref(false);
-const cartQuantity = ref(0);
+const cartStore = useCartStore();
+const cartQuantity = computed(() => cartStore.totalQuantity);
 const displayName = computed(() => userDisplayName.value)
 const isSticky = ref(false);
 const stickyHeaderHeight = ref(0);
@@ -439,6 +440,8 @@ const handleScroll = () => {
 onMounted(() => {
   document.addEventListener("click", closeDropdowns);
   window.addEventListener("scroll", handleScroll, { passive: true });
+  // Initialize cart store to load data from localStorage
+  cartStore.initializeCart();
 });
 
 onBeforeUnmount(() => {

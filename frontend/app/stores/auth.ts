@@ -29,6 +29,7 @@ interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null
+  token: string | null
   loading: boolean
   error: string | null
   isAuthenticated: boolean
@@ -37,6 +38,7 @@ interface AuthState {
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     user: null,
+    token: null,
     loading: false,
     error: null,
     isAuthenticated: false
@@ -52,6 +54,54 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    // Save user and token to localStorage
+    saveUserToStorage(user: AuthUser | null, token: string | null = null) {
+      if (import.meta.client) {
+        if (user) {
+          localStorage.setItem('tgdd_user', JSON.stringify(user))
+          localStorage.setItem('tgdd_auth_status', 'true')
+          if (token) {
+            localStorage.setItem('tgdd_token', token)
+          }
+        } else {
+          localStorage.removeItem('tgdd_user')
+          localStorage.removeItem('tgdd_auth_status')
+          localStorage.removeItem('tgdd_token')
+        }
+      }
+    },
+
+    // Load user and token from localStorage
+    loadUserFromStorage(): { user: AuthUser | null; token: string | null } {
+      if (import.meta.client) {
+        const userData = localStorage.getItem('tgdd_user')
+        const authStatus = localStorage.getItem('tgdd_auth_status')
+        const token = localStorage.getItem('tgdd_token')
+        
+        if (userData && authStatus === 'true') {
+          try {
+            return {
+              user: JSON.parse(userData),
+              token: token
+            }
+          } catch {
+            // Clear corrupted data
+            this.clearStorage()
+          }
+        }
+      }
+      return { user: null, token: null }
+    },
+
+    // Clear localStorage
+    clearStorage() {
+      if (import.meta.client) {
+        localStorage.removeItem('tgdd_user')
+        localStorage.removeItem('tgdd_auth_status')
+        localStorage.removeItem('tgdd_token')
+      }
+    },
+
     getAuthInstance() {
       const nuxtApp = useNuxtApp()
       // Prefer injected instance from plugin, but safely fallback
@@ -78,6 +128,14 @@ export const useAuthStore = defineStore('auth', {
       return getAuth()
     },
     async initAuth() {
+      // Try to load from localStorage first
+      const savedData = this.loadUserFromStorage()
+      if (savedData.user) {
+        this.user = savedData.user
+        this.token = savedData.token
+        this.isAuthenticated = true
+      }
+
       const $auth = this.getAuthInstance()
       
       return new Promise((resolve) => {
@@ -92,7 +150,9 @@ export const useAuthStore = defineStore('auth', {
             }
           } else {
             this.user = null
+            this.token = null
             this.isAuthenticated = false
+            this.clearStorage()
           }
           resolve(firebaseUser)
         })
@@ -102,6 +162,7 @@ export const useAuthStore = defineStore('auth', {
     async syncWithBackend(firebaseUser: User) {
       try {
         const token = await firebaseUser.getIdToken()
+        this.token = token // Store token in state
         const config = useRuntimeConfig()
 
         // Retry transient errors (5xx/network) a few times during initial app load
@@ -122,6 +183,9 @@ export const useAuthStore = defineStore('auth', {
               this.user = data.user || data
               this.isAuthenticated = true
               this.error = null
+              
+              // Save to localStorage with token
+              this.saveUserToStorage(this.user, this.token)
               return
             }
 
