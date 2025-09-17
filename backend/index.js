@@ -2,7 +2,6 @@ const { ServiceBroker } = require("moleculer");
 const path = require("path");
 require('dotenv').config();
 
-// Create broker
 const broker = new ServiceBroker({
   nodeID: process.env.NODE_ID || null,
   namespace: "thegioididong",
