@@ -9,10 +9,10 @@
       <!-- Hidden when sticky -->
       <div
         v-show="!isSticky"
-        class="text-white text-xs  bg-[#754b01] h-[44px]"
+        class="text-white text-xs  bg-[#FFD400] h-[44px]"
       >
       <div class="max-w-[1200px] mx-auto">
-        <img class="w-full" src="https://cdnv2.tgdd.vn/mwg-static/tgdd/Banner/da/5c/da5c0c94bd366ce2b9162235b7660b69.png" alt="Banner">
+        <img class="w-full" src="//cdnv2.tgdd.vn/mwg-static/tgdd/Banner/b4/59/b45940d7746f137d6b2dfd2268f02607.png" alt="Banner">
       </div>
       </div>
 
