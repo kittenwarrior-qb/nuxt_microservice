@@ -84,7 +84,6 @@ const broker = new ServiceBroker({
   }
 });
 
-// Load services
 broker.loadService(path.join(__dirname, "services", "database.service.js"));
 broker.loadService(path.join(__dirname, "services", "api.service.js"));
 broker.loadService(path.join(__dirname, "services", "auth.service.js"));
@@ -92,7 +91,6 @@ broker.loadService(path.join(__dirname, "services", "products.service.js"));
 broker.loadService(path.join(__dirname, "services", "users.service.js"));
 broker.loadService(path.join(__dirname, "services", "categories.service.js"));
 
-// Start broker
 broker.start()
   .then(() => {
     broker.logger.info("Moleculer broker started successfully");
@@ -103,7 +101,6 @@ broker.start()
     process.exit(1);
   });
 
-// Graceful shutdown
 process.on("SIGINT", () => {
   broker.logger.info("Shutting down gracefully...");
   broker.stop()

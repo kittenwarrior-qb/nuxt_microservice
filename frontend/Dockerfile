@@ -1,14 +1,16 @@
 # Multi-stage build for Nuxt 4 frontend
-FROM node:18-alpine AS base
+FROM node:20.19.0-bookworm-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# On Debian-based images, glibc is available by default; no extra packages required
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+# Avoid running postinstall (nuxt prepare) before source is copied
+ENV NPM_CONFIG_IGNORE_SCRIPTS=true
+RUN npm ci && npm cache clean --force
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -17,6 +19,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build the application
+# Build runs scripts as needed (including nuxt prepare)
 RUN npm run build
 
 # Production image, copy all the files and run nuxt
