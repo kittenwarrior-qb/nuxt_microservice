@@ -86,6 +86,7 @@ const broker = new ServiceBroker({
 });
 
 // Load services
+broker.loadService(path.join(__dirname, "services", "database.service.js"));
 broker.loadService(path.join(__dirname, "services", "api.service.js"));
 broker.loadService(path.join(__dirname, "services", "auth.service.js"));
 broker.loadService(path.join(__dirname, "services", "products.service.js"));

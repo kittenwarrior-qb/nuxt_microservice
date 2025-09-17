@@ -173,9 +173,17 @@ module.exports = {
         await this.createIndexes();
       }
       
-      // Log connection pool info
-      const pool = this.adapter.db.connectionManager.pool;
-      this.logger.info(`Database pool: ${pool.size}/${pool.options.max} connections`);
+      // Log connection pool info (safely)
+      try {
+        const pool = this.adapter.db.connectionManager?.pool;
+        if (pool && pool.options) {
+          this.logger.info(`Database pool: ${pool.size}/${pool.options.max} connections`);
+        } else {
+          this.logger.info("Database connection established (pool info not available)");
+        }
+      } catch (poolError) {
+        this.logger.info("Database connection established");
+      }
       
     } catch (error) {
       this.logger.error("Unable to connect to database:", error);
