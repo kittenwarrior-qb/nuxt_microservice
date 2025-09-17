@@ -2,7 +2,7 @@ name: Simple CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, production ]
 
 env:
   REGISTRY: ghcr.io
@@ -58,11 +58,24 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/production'
     
     steps:
-    - name: Deploy notification
-      run: |
-        echo "Ready to deploy!"
-        echo "Docker images have been built and pushed to registry"
-        echo "You can now pull and run them on your server"
+    - name: SSH Deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: 22
+        script: |
+          cd /root/services/thegioididong
+          git fetch origin
+          git checkout production
+          git pull
+
+          docker-compose down
+          docker-compose build --no-cache
+          docker-compose up -d
+
+          docker image prune -f
