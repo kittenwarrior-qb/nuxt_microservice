@@ -17,12 +17,12 @@ const broker = new ServiceBroker({
   
   logLevel: "warn",
   
-  transporter: null, // No transporter for serverless
+  transporter: null, 
   cacher: "Memory",
   
   serializer: "JSON",
   
-  requestTimeout: 5 * 1000, // Shorter timeout for serverless
+  requestTimeout: 5 * 1000, 
   retryPolicy: {
     enabled: false
   },
