@@ -17,7 +17,6 @@ module.exports = {
   
   logLevel: process.env.LOGLEVEL || "info",
   
-  // Run as a standalone node to avoid connecting to any stale nodes
   transporter: null,
   
   cacher: process.env.CACHER || "Memory",
