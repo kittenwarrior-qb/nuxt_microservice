@@ -17,6 +17,12 @@ jobs:
           port: 22
           script: |
             cd /root/services/nuxt_microservice
+            # Remove any GitHub-injected extra headers that can break pulls on the VPS
+            git config --global --unset-all http.https://github.com/.extraheader || true
+            git config --system --unset-all http.https://github.com/.extraheader || true
+            git config --local --unset-all http.https://github.com/.extraheader || true
+            # Mark repo as safe directory to avoid ownership warnings
+            git config --global --add safe.directory /root/services/nuxt_microservice || true
             git fetch origin
             git checkout production
             git pull
