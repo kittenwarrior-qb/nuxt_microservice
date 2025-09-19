@@ -74,6 +74,10 @@ services:
       - TRANSPORTER=nats://nats:4222
       - CACHER=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:-your-production-jwt-secret}
+      # CORS / Frontend origins (read by api.service.js & chat.service.js)
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://172.236.138.136}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
       - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
@@ -104,7 +108,9 @@ services:
       dockerfile: Dockerfile
     container_name: tgdd-frontend
     environment:
-      - NUXT_PUBLIC_API_BASE_URL=http://backend:3001/api/v1
+      # Use public origin (through nginx) so the browser never calls Docker service names
+      - NUXT_PUBLIC_API_BASE_URL=http://172.236.138.136/api/v1
+      - NUXT_PUBLIC_BASE_URL=http://172.236.138.136
       - NUXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}
       - NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
       - NUXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
