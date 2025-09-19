@@ -43,7 +43,8 @@ export const useCartStore = defineStore('cart', () => {
 
   const totalPrice = computed(() => {
     return items.value.reduce((total, item) => {
-      const price = parseFloat(item.price.toString().replace(/[^\d]/g, ''))
+      const priceStr = item.price.toString().replace(/[đ₫\s,]/g, '')
+      const price = parseFloat(priceStr) || 0
       return total + (price * item.quantity)
     }, 0)
   })

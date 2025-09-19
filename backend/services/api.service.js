@@ -75,7 +75,9 @@ module.exports = {
           "products.*",
           "categories.*",
           "product_tags.*",
-          "orders.*"
+          "orders.*",
+          "chat.*",
+          "location.*"
         ],
         
         use: [
@@ -189,5 +191,13 @@ module.exports = {
   
   started() {
     this.logger.info(`API Gateway started on port ${this.settings.port}`);
+    
+    // Initialize Socket.IO after server starts
+    if (this.server) {
+      const chatService = this.broker.getLocalService("chat");
+      if (chatService) {
+        chatService.initSocketIO(this.server);
+      }
+    }
   }
 };
