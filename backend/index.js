@@ -131,5 +131,4 @@ process.on("SIGTERM", () => {
       process.exit(1);
     });
 });
-
 module.exports = broker;
