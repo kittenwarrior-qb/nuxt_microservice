@@ -67,7 +67,9 @@ export const CartService = {
   getTotalPrice(): number {
     const cart = this.getCart();
     return cart.reduce((total, item) => {
-      const price = parseFloat(item.price.toString().replace(/[^\d]/g, ''));
+      // Remove currency symbols and spaces, but keep decimal points
+      const priceStr = item.price.toString().replace(/[đ₫\s,]/g, '');
+      const price = parseFloat(priceStr) || 0;
       return total + (price * item.quantity);
     }, 0);
   },

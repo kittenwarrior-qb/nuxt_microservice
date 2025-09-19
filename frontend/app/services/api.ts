@@ -4,13 +4,20 @@ class ApiService {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || 'http://localhost:3001/api/v1'
+    // Get API base URL from runtime config or fallback to provided baseURL
+    if (import.meta.client && !baseURL) {
+      const config = useRuntimeConfig()
+      this.baseURL = config.public.apiBaseUrl || 'http://localhost:3001/api/v1'
+    } else {
+      this.baseURL = baseURL || 'http://localhost:3001/api/v1'
+    }
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    // Ensure we have a full URL
     const url = this.baseURL.startsWith('http') 
       ? `${this.baseURL}${endpoint}`
-      : `http://localhost:3001/api/v1${endpoint}`
+      : `${this.baseURL}${endpoint}`
     
     console.log('Making API request to:', url)
     

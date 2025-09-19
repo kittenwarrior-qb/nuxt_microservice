@@ -121,13 +121,7 @@
             </div>
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
-                <button
-                  class="flex items-center gap-1 bg-[#ffe14c] hover:bg-[#FFEE99] rounded-full px-2 h-[42px] lg:w-[300px]"
-                  @click="showLocationModal = true"
-                >
-                  <img src="/icons/location_icon.png" width="17" height="23" alt="location">
-                  <p class="text-[14px] translate-y-[2px]">Thành phố Hồ Chí Minh</p>
-                </button>
+                <LocationSelector />
               </div>
             </div>
           </div>

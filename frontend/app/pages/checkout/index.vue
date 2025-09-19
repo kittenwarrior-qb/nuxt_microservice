@@ -134,7 +134,11 @@ interface CreateResult {
 
 const zlp = reactive<{ data: ZaloPayCreateResponse | null; app_trans_id?: string }>({ data: null })
 
-const parsePrice = (price: string) => parseFloat((price || '0').toString().replace(/[^\d]/g, '')) || 0
+const parsePrice = (price: string) => {
+  // Remove currency symbols and spaces, but keep decimal points
+  const priceStr = (price || '0').toString().replace(/[đ₫\s,]/g, '')
+  return parseFloat(priceStr) || 0
+}
 const subtotal = computed(() => cartStore.items.reduce((sum, item) => sum + parsePrice(item.price) * item.quantity, 0))
 const total = computed(() => subtotal.value)
 const formatPrice = (n: number) => n.toLocaleString('vi-VN') + 'đ'

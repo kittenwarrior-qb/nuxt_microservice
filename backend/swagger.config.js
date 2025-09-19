@@ -1,5 +1,58 @@
 const swaggerJSDoc = require('swagger-jsdoc');
 
+// Get environment variables
+const PORT = process.env.PORT || 3001;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${PORT}`;
+
+// Determine server configuration based on environment
+const getServers = () => {
+  const servers = [];
+  
+  console.log(`[Swagger] Environment: ${NODE_ENV}`);
+  console.log(`[Swagger] Port: ${PORT}`);
+  console.log(`[Swagger] API_BASE_URL: ${API_BASE_URL}`);
+  console.log(`[Swagger] PRODUCTION_URL: ${process.env.PRODUCTION_URL || 'not set'}`);
+  
+  if (NODE_ENV === 'production') {
+    // Production server
+    if (process.env.PRODUCTION_URL) {
+      servers.push({
+        url: process.env.PRODUCTION_URL,
+        description: 'Production server'
+      });
+      console.log(`[Swagger] Added production server: ${process.env.PRODUCTION_URL}`);
+    }
+    // Fallback to API_BASE_URL if PRODUCTION_URL not set
+    if (API_BASE_URL && API_BASE_URL !== `http://localhost:${PORT}`) {
+      servers.push({
+        url: API_BASE_URL,
+        description: 'Production server (fallback)'
+      });
+      console.log(`[Swagger] Added production fallback server: ${API_BASE_URL}`);
+    }
+  } else {
+    // Development server
+    servers.push({
+      url: API_BASE_URL,
+      description: 'Development server'
+    });
+    console.log(`[Swagger] Added development server: ${API_BASE_URL}`);
+  }
+  
+  // Always include localhost as fallback for development
+  if (NODE_ENV !== 'production') {
+    servers.push({
+      url: `http://localhost:${PORT}`,
+      description: 'Local development server'
+    });
+    console.log(`[Swagger] Added localhost fallback: http://localhost:${PORT}`);
+  }
+  
+  console.log(`[Swagger] Total servers configured: ${servers.length}`);
+  return servers;
+};
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -12,12 +65,7 @@ const options = {
         email: 'support@thegioididong.com'
       }
     },
-    servers: [
-      {
-        url: 'http://localhost:3001',
-        description: 'Development server'
-      }
-    ],
+    servers: getServers(),
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -70,6 +118,57 @@ const options = {
             error: { type: 'string' },
             message: { type: 'string' },
             code: { type: 'integer' }
+          }
+        },
+        Province: {
+          type: 'object',
+          properties: {
+            code: { type: 'number' },
+            codename: { type: 'string' },
+            division_type: { type: 'string' },
+            name: { type: 'string' },
+            phone_code: { type: 'number' },
+            districts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Ward' }
+            }
+          }
+        },
+        Ward: {
+          type: 'object',
+          properties: {
+            code: { type: 'number' },
+            codename: { type: 'string' },
+            division_type: { type: 'string' },
+            name: { type: 'string' },
+            province_code: { type: 'number' }
+          }
+        },
+        LocationResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            data: { type: 'object' },
+            error: { type: 'string' }
+          }
+        },
+        SearchResult: {
+          type: 'object',
+          properties: {
+            display_name: { type: 'string' },
+            lat: { type: 'string' },
+            lon: { type: 'string' },
+            address: {
+              type: 'object',
+              properties: {
+                house_number: { type: 'string' },
+                road: { type: 'string' },
+                suburb: { type: 'string' },
+                city: { type: 'string' },
+                state: { type: 'string' },
+                country: { type: 'string' }
+              }
+            }
           }
         }
       }
@@ -508,6 +607,344 @@ const options = {
               content: {
                 'application/json': {
                   schema: { $ref: '#/components/schemas/Error' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/provinces': {
+        get: {
+          summary: 'Get All Provinces',
+          description: 'Get list of all provinces in Vietnam',
+          tags: ['Location'],
+          responses: {
+            '200': {
+              description: 'List of provinces',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/Province' }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '500': {
+              description: 'Server error',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/provinces/{code}': {
+        get: {
+          summary: 'Get Province by Code',
+          description: 'Get specific province information by province code',
+          tags: ['Location'],
+          parameters: [
+            {
+              name: 'code',
+              in: 'path',
+              required: true,
+              schema: { type: 'number' },
+              description: 'Province code'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Province information',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: { $ref: '#/components/schemas/Province' }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '404': {
+              description: 'Province not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/wards': {
+        get: {
+          summary: 'Get All Wards',
+          description: 'Get list of all wards/districts in Vietnam',
+          tags: ['Location'],
+          responses: {
+            '200': {
+              description: 'List of wards',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/Ward' }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '500': {
+              description: 'Server error',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/wards/{provinceCode}': {
+        get: {
+          summary: 'Get Wards by Province',
+          description: 'Get all wards/districts in a specific province',
+          tags: ['Location'],
+          parameters: [
+            {
+              name: 'provinceCode',
+              in: 'path',
+              required: true,
+              schema: { type: 'number' },
+              description: 'Province code'
+            },
+            {
+              name: 'type',
+              in: 'query',
+              schema: { type: 'string' },
+              description: 'Filter by division type (e.g., "Quận", "Huyện", "Phường", "Xã")'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'List of wards in province',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/Ward' }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '404': {
+              description: 'Province not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/ward/{code}': {
+        get: {
+          summary: 'Get Ward by Code',
+          description: 'Get specific ward information by ward code',
+          tags: ['Location'],
+          parameters: [
+            {
+              name: 'code',
+              in: 'path',
+              required: true,
+              schema: { type: 'number' },
+              description: 'Ward code'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Ward information',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: { $ref: '#/components/schemas/Ward' }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '404': {
+              description: 'Ward not found',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/search': {
+        get: {
+          summary: 'Search Address',
+          description: 'Search for addresses using Nominatim OpenStreetMap API with debounce support',
+          tags: ['Location'],
+          parameters: [
+            {
+              name: 'q',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' },
+              description: 'Search query (address, place name, etc.)'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Search results',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/SearchResult' }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '400': {
+              description: 'Missing search query',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/reverse': {
+        get: {
+          summary: 'Reverse Geocoding',
+          description: 'Get address information from latitude and longitude coordinates',
+          tags: ['Location'],
+          parameters: [
+            {
+              name: 'lat',
+              in: 'query',
+              required: true,
+              schema: { type: 'number' },
+              description: 'Latitude coordinate'
+            },
+            {
+              name: 'lon',
+              in: 'query',
+              required: true,
+              schema: { type: 'number' },
+              description: 'Longitude coordinate'
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Address information',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/LocationResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: { $ref: '#/components/schemas/SearchResult' }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            '400': {
+              description: 'Missing coordinates',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/LocationResponse' }
+                }
+              }
+            }
+          }
+        }
+      },
+      '/api/v1/location/cache/clear': {
+        post: {
+          summary: 'Clear Location Cache',
+          description: 'Clear the location service cache (admin only)',
+          tags: ['Location'],
+          responses: {
+            '200': {
+              description: 'Cache cleared successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean' },
+                      message: { type: 'string' }
+                    }
+                  }
                 }
               }
             }

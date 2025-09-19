@@ -140,7 +140,8 @@ const productId = computed(() => Number(route.params.id))
 const isAddingToCart = ref(false)
 
 // Fetch product data
-const { data: product, pending, error } = await useFetch<Product>(`http://localhost:3001/api/v1/products/${productId.value}`)
+const config = useRuntimeConfig()
+const { data: product, pending, error } = await useFetch<Product>(`${config.public.apiBaseUrl}/products/${productId.value}`)
 
 // Format price helper
 const formatPrice = (price: string | number | undefined) => {
