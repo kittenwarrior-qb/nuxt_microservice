@@ -77,23 +77,20 @@ module.exports = {
       const devOrigins = process.env.NODE_ENV === 'development' ? [
         "http://localhost:3000",
         "http://localhost:5173", 
-        "http://localhost"
+        "http://localhost",
+        "*"
       ] : [];
       
       const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins, ...devOrigins])];
       
       this.io = new Server(server, {
         cors: {
-          origin: (origin, callback) => {
-            if (!origin || allowedOrigins.includes(origin)) {
-              callback(null, true);
-            } else {
-              callback(new Error("Not allowed by CORS"));
-            }
-          },
-          credentials: true,
+          origin: true,
+          credentials: true
         },
-        path: "/socket.io/"
+        path: "/socket.io/",
+        transports: ["websocket", "polling"],
+        allowEIO3: true
       });
       
       this.io.on("connection", (socket) => {

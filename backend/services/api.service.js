@@ -4,6 +4,18 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const swaggerSpec = require("../swagger.config");
 
+// Build allowed CORS origins from environment for flexibility in Docker/prod
+const envOrigins = process.env.FRONTEND_ORIGINS
+  ? process.env.FRONTEND_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
+const defaultOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+  "http://localhost:3000",
+  "http://localhost:5173",
+].filter(Boolean);
+const allowedOrigins = Array.from(new Set([...envOrigins, ...defaultOrigins]));
+
 module.exports = {
   name: "api",
   
@@ -82,8 +94,15 @@ module.exports = {
         
         use: [
           cors({
-            origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-            credentials: process.env.CORS_CREDENTIALS === "true",
+            origin: (origin, callback) => {
+              // Allow no-origin requests (like curl or server-to-server)
+              if (!origin) return callback(null, true);
+              if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+              }
+              return callback(new Error(`Not allowed by CORS: ${origin}`));
+            },
+            credentials: process.env.CORS_CREDENTIALS === "true" || true,
             methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
           })

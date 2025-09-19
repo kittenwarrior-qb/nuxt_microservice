@@ -166,11 +166,17 @@ const initSocket = async () => {
     const { io } = await import('socket.io-client')
     
     const config = useRuntimeConfig()
-    const socketUrl = config.public.apiBaseUrl?.replace('/api/v1', '') || `${window.location.protocol}//${window.location.hostname}:3001`
-    
-    socket = io(socketUrl, {
+    const inferredOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+    const socketBase = (config.public.apiBaseUrl?.replace('/api/v1', '')) || inferredOrigin
+
+    socket = io(socketBase, {
+      path: '/socket.io/',
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000
     })
 
     socket.on('connect', () => {
