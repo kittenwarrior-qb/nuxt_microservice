@@ -23,9 +23,12 @@ jobs:
             git config --local --unset-all http.https://github.com/.extraheader || true
             # Mark repo as safe directory to avoid ownership warnings
             git config --global --add safe.directory /root/services/nuxt_microservice || true
-            git fetch origin
-            git checkout production
-            git pull
+            set -e
+            git fetch --all --prune
+            git checkout production || git checkout -b production
+            # Discard any local changes to ensure clean deployment
+            git reset --hard origin/production
+            git clean -fd
 
             docker-compose down
             docker-compose build --no-cache
