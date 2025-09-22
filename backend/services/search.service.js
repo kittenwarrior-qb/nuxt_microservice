@@ -125,12 +125,10 @@ module.exports = {
         await this.waitForES();
         
         // Create index if not exists
-        const indexCreated = await this.createIndexIfNotExists();
+        await this.createIndexIfNotExists();
         
-        // Import data if index is empty
-        if (indexCreated) {
-          await this.importDataIfEmpty();
-        }
+        // Always try to import data if index is empty
+        await this.importDataIfEmpty();
         
         this.logger.info('✅ Elasticsearch auto-setup completed!');
       } catch (error) {
