@@ -75,8 +75,8 @@ services:
       - CACHER=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:-your-production-jwt-secret}
       # CORS / Frontend origins (read by api.service.js & chat.service.js)
-      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://172.236.138.136}
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136,http://tgddclone.duckdns.org:3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://tgddclone.duckdns.org:3000}
       - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
