@@ -140,5 +140,3 @@ services:
     networks:
       - tgdd-network
     restart: unless-stopped
-    profiles:
-      - tools
