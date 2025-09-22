@@ -27,8 +27,8 @@ module.exports = {
       this.es = new Client({ node, auth });
       this.logger.info('Elasticsearch client initialized');
       
-      // Auto-setup ES in production
-      if (process.env.NODE_ENV === 'production') {
+      // Auto-setup ES in production (disabled temporarily for debugging)
+      if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ES_AUTO_SETUP === 'true') {
         this.autoSetupElasticsearch();
       }
     } else {
