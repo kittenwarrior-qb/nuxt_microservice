@@ -12,7 +12,8 @@ export default defineNuxtConfig({
       firebaseStorageBucket: process.env.FIREBASE_STORAGE_BUCKET,
       firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
       firebaseAppId: process.env.FIREBASE_APP_ID,
-      apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3001/api/v1'
+      // Use Nuxt public var if provided, fallback to API_BASE_URL, then to relative path
+      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || '/api/v1'
     }
   },
   
