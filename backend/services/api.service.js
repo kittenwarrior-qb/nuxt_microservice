@@ -89,7 +89,8 @@ module.exports = {
           "product_tags.*",
           "orders.*",
           "chat.*",
-          "location.*"
+          "location.*",
+          "search.*"
         ],
         
         use: [

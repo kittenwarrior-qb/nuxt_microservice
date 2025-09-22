@@ -90,6 +90,7 @@ broker.loadService(path.join(__dirname, "services", "chat.service.js"));
 broker.loadService(path.join(__dirname, "services", "api.service.js"));
 broker.loadService(path.join(__dirname, "services", "auth.service.js"));
 broker.loadService(path.join(__dirname, "services", "products.service.js"));
+broker.loadService(path.join(__dirname, "services", "search.service.js"));
 broker.loadService(path.join(__dirname, "services", "users.service.js"));
 broker.loadService(path.join(__dirname, "services", "categories.service.js"));
 

@@ -83,6 +83,14 @@ class ApiService {
     return this.request<Product[]>(`/products/search?${searchParams.toString()}`)
   }
 
+  // Product suggestions for header search (Elasticsearch-backed)
+  async suggestProducts(q: string, limit = 8): Promise<Pick<Product, 'id' | 'name' | 'price' | 'brand' | 'category' | 'img'>[]> {
+    const searchParams = new URLSearchParams()
+    searchParams.append('q', q)
+    searchParams.append('limit', String(limit))
+    return this.request(`/search/suggest?${searchParams.toString()}`)
+  }
+
   async getFlashSaleProducts(page = 1, pageSize = 10): Promise<Product[]> {
     return this.request<Product[]>(`/products/flash-sale?page=${page}&pageSize=${pageSize}`)
   }

@@ -30,15 +30,50 @@
               <img src="/logo/logo3.png" alt="logo" width="30px" height="30px" class="block md:hidden">
             </NuxtLink>
 
-            <div class="flex items-center bg-white rounded-full shadow-sm flex-1 w-full lg:max-w-[415px] h-[40px] px-3 transition-all duration-300">
+            <div class="flex items-center bg-white rounded-full shadow-sm flex-1 w-full lg:max-w-[415px] h-[40px] px-3 transition-all duration-300 relative">
               <img src="/icons/search_icon.png" width="17" height="17" alt="search">
               <input
                 v-model="searchQuery"
                 type="text"
                 placeholder="Bạn tìm gì..."
                 class="outline-none h-full bg-transparent flex-1 px-3 placeholder-orange-400 text-sm placeholder:text-sm transition-all duration-300"
-                @keyup.enter="handleSearch"
+                @input="onSearchInput"
+                @keyup.enter="handleEnterKey"
+                @keydown.down.prevent="moveHighlight(1)"
+                @keydown.up.prevent="moveHighlight(-1)"
               >
+              <!-- Suggestions Dropdown (Desktop) -->
+              <div
+                v-if="showSuggestions && suggestions.length > 0"
+                class="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-80 overflow-auto"
+              >
+                <ul>
+                  <li
+                    v-for="(item, idx) in suggestions"
+                    :key="item.id ?? item.name + idx"
+                    @mousedown.prevent="selectSuggestion(item)"
+                    :class="[
+                      'flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50',
+                      highlightedIndex === idx ? 'bg-gray-100' : ''
+                    ]"
+                  >
+                    <img v-if="item.img" :src="item.img" alt="thumb" class="w-8 h-8 object-cover rounded" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm truncate">{{ item.name }}</p>
+                      <p v-if="item.brand || item.category" class="text-xs text-gray-500 truncate">
+                        {{ [item.brand, item.category].filter(Boolean).join(' • ') }}
+                      </p>
+                    </div>
+                    <span v-if="item.price" class="text-xs text-gray-600 whitespace-nowrap">{{ item.price }}</span>
+                  </li>
+                </ul>
+                <button
+                  class="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-gray-50 border-t"
+                  @mousedown.prevent="goToFullSearch"
+                >
+                  Xem tất cả kết quả cho "{{ searchQuery }}"
+                </button>
+              </div>
             </div>
 
             <!-- User Actions -->
@@ -170,15 +205,50 @@
                 <img src="/icons/menu_icon.png" width="20" height="20" alt="menu">
               </button>
               
-              <div class="flex items-center bg-white rounded-full shadow-sm flex-1 h-[40px] px-3">
+              <div class="flex items-center bg-white rounded-full shadow-sm flex-1 h-[40px] px-3 relative">
                 <img src="/icons/search_icon.png" width="17" height="17" alt="search">
                 <input
                   v-model="searchQuery"
                   type="text"
                   placeholder="Bạn tìm gì..."
                   class="outline-none h-full bg-transparent flex-1 px-3 placeholder-orange-400 text-sm placeholder:text-sm"
-                  @keyup.enter="handleSearch"
+                  @input="onSearchInput"
+                  @keyup.enter="handleEnterKey"
+                  @keydown.down.prevent="moveHighlight(1)"
+                  @keydown.up.prevent="moveHighlight(-1)"
                 >
+                <!-- Suggestions Dropdown (Mobile) -->
+                <div
+                  v-if="showSuggestions && suggestions.length > 0"
+                  class="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-80 overflow-auto"
+                >
+                  <ul>
+                    <li
+                      v-for="(item, idx) in suggestions"
+                      :key="item.id ?? item.name + idx"
+                      @mousedown.prevent="selectSuggestion(item)"
+                      :class="[
+                        'flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50',
+                        highlightedIndex === idx ? 'bg-gray-100' : ''
+                      ]"
+                    >
+                      <img v-if="item.img" :src="item.img" alt="thumb" class="w-8 h-8 object-cover rounded" />
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm truncate">{{ item.name }}</p>
+                        <p v-if="item.brand || item.category" class="text-xs text-gray-500 truncate">
+                          {{ [item.brand, item.category].filter(Boolean).join(' • ') }}
+                        </p>
+                      </div>
+                      <span v-if="item.price" class="text-xs text-gray-600 whitespace-nowrap">{{ item.price }}</span>
+                    </li>
+                  </ul>
+                  <button
+                    class="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-gray-50 border-t"
+                    @mousedown.prevent="goToFullSearch"
+                  >
+                    Xem tất cả kết quả cho "{{ searchQuery }}"
+                  </button>
+                </div>
               </div>
               
               <!-- <NuxtLink
@@ -307,11 +377,19 @@ import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { navigateTo } from 'nuxt/app'
 import { useAuthStore } from "../stores/auth";
 import { storeToRefs } from 'pinia'
+import { ApiService } from '../services/api'
 
 const authStore = useAuthStore()
 const { isAuthenticated, userDisplayName } = storeToRefs(authStore)
 
 const searchQuery = ref("");
+// Suggestion state
+type SuggestItem = { id?: string | number; name: string; price?: string; brand?: string; category?: string; img?: string }
+const suggestions = ref<SuggestItem[]>([])
+const showSuggestions = ref(false)
+const highlightedIndex = ref(-1)
+let suggestTimeout: ReturnType<typeof setTimeout> | null = null
+const api = new ApiService()
 const activeCategory = ref<number | null>(null);
 const showLocationModal = ref(false);
 const cartStore = useCartStore();
@@ -386,11 +464,63 @@ const toggleCategory = (categoryId: number) => {
     activeCategory.value === categoryId ? null : categoryId;
 };
 
-const handleSearch = () => {
-  if (searchQuery.value.trim()) {
-    navigateTo(`/search?q=${encodeURIComponent(searchQuery.value)}`);
+const fetchSuggestions = async () => {
+  const q = searchQuery.value.trim()
+  if (!q) {
+    suggestions.value = []
+    showSuggestions.value = false
+    highlightedIndex.value = -1
+    return
   }
-};
+  try {
+    const data = await api.suggestProducts(q, 8)
+    suggestions.value = data
+    showSuggestions.value = data.length > 0
+    highlightedIndex.value = data.length > 0 ? 0 : -1
+  } catch (e) {
+    console.error('Failed to fetch suggestions', e)
+    suggestions.value = []
+    showSuggestions.value = false
+    highlightedIndex.value = -1
+  }
+}
+
+const onSearchInput = () => {
+  if (suggestTimeout) clearTimeout(suggestTimeout)
+  suggestTimeout = setTimeout(fetchSuggestions, 250)
+}
+
+const moveHighlight = (delta: number) => {
+  if (!showSuggestions.value || suggestions.value.length === 0) return
+  const len = suggestions.value.length
+  highlightedIndex.value = (highlightedIndex.value + delta + len) % len
+}
+
+const selectSuggestion = (item: SuggestItem) => {
+  showSuggestions.value = false
+  if (item?.id != null) {
+    navigateTo(`/detail/${item.id}`)
+  } else if (item?.name) {
+    navigateTo(`/search?q=${encodeURIComponent(item.name)}`)
+  }
+}
+
+const goToFullSearch = () => {
+  const q = searchQuery.value.trim()
+  if (!q) return
+  showSuggestions.value = false
+  navigateTo(`/search?q=${encodeURIComponent(q)}`)
+}
+
+const handleEnterKey = () => {
+  if (showSuggestions.value && highlightedIndex.value >= 0 && highlightedIndex.value < suggestions.value.length) {
+    const item = suggestions.value[highlightedIndex.value]
+    if (!item) return
+    selectSuggestion(item)
+  } else {
+    goToFullSearch()
+  }
+}
 
 const handleLogout = async () => {
   try {
@@ -404,6 +534,7 @@ const handleLogout = async () => {
 const closeDropdowns = () => {
   activeCategory.value = null;
   userMenuOpen.value = false;
+  showSuggestions.value = false;
 };
 
 // Scroll handler with throttling for performance
@@ -443,6 +574,9 @@ onBeforeUnmount(() => {
   window.removeEventListener("scroll", handleScroll);
   if (scrollTimeout) {
     clearTimeout(scrollTimeout);
+  }
+  if (suggestTimeout) {
+    clearTimeout(suggestTimeout)
   }
 });
 </script>
