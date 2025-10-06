@@ -7,7 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: SSH Deploy
         uses: appleboy/ssh-action@master
@@ -16,26 +16,23 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: 22
-          timeout: 25m
+          timeout: 8m
           script: |
             cd /root/repositories/thegioididong
             
-            # Remove any GitHub-injected extra headers that can break pulls on the VPS
+            # Git configuration
             git config --global --unset-all http.https://github.com/.extraheader || true
             git config --system --unset-all http.https://github.com/.extraheader || true
             git config --local --unset-all http.https://github.com/.extraheader || true
-            
-            # Mark repo as safe directory to avoid ownership warnings
             git config --global --add safe.directory /root/repositories/thegioididong || true
             
             set -e
             git fetch --all --prune
             git checkout production || git checkout -b production
-            # Discard any local changes to ensure clean deployment
             git reset --hard origin/production
             git clean -fd
 
-            # Install docker-compose if not exists
+            # Install docker-compose if needed
             if ! command -v docker-compose &> /dev/null; then
                 echo "Installing docker-compose..."
                 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -43,21 +40,48 @@ jobs:
                 ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
             fi
 
-            # Verify docker-compose installation
-            docker-compose --version
-
-            # Stop containers gracefully
-            docker-compose down
+            # Create deployment script
+            cat > deploy.sh << 'EOF'
+            #!/bin/bash
+            cd /root/repositories/thegioididong
             
-            # Build with no cache
-            docker-compose build --no-cache
+            echo "$(date): Starting deployment..." >> deploy.log
+            
+            # Stop containers
+            docker-compose down --timeout 30 >> deploy.log 2>&1
+            
+            # Clean up
+            docker image prune -f >> deploy.log 2>&1
+            
+            # Build (this takes long time)
+            echo "$(date): Building backend..." >> deploy.log
+            docker-compose build backend >> deploy.log 2>&1
+            
+            echo "$(date): Building frontend..." >> deploy.log
+            docker-compose build frontend >> deploy.log 2>&1
             
             # Start services
-            docker-compose up -d
-
-            # Cleanup old images
-            docker image prune -f
+            echo "$(date): Starting services..." >> deploy.log
+            docker-compose up -d postgres redis nats elasticsearch >> deploy.log 2>&1
+            sleep 30
             
-            # Final status check
-            echo "Deployment complete. Container status:"
-            docker-compose ps
+            docker-compose up -d backend >> deploy.log 2>&1
+            sleep 15
+            
+            docker-compose up -d frontend pgadmin >> deploy.log 2>&1
+            
+            echo "$(date): Deployment complete!" >> deploy.log
+            docker-compose ps >> deploy.log 2>&1
+            
+            # Create completion marker
+            touch deployment_complete.flag
+            EOF
+            
+            chmod +x deploy.sh
+            
+            # Run deployment in background
+            nohup ./deploy.sh &
+            
+            echo "Deployment started in background. Check progress with:"
+            echo "tail -f /root/repositories/thegioididong/deploy.log"
+            echo "Check completion: ls -la /root/repositories/thegioididong/deployment_complete.flag"
