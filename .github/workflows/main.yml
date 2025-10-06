@@ -31,91 +31,20 @@ jobs:
             git checkout production || git checkout -b production
             git reset --hard origin/production
             git clean -fd
-
-            # Install docker-compose if needed
-            if ! command -v docker-compose &> /dev/null; then
-                echo "Installing docker-compose..."
-                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-                chmod +x /usr/local/bin/docker-compose
-                ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-            fi
-
-            # Create deployment script with immediate build and start
-            cat > deploy.sh << 'EOF'
-            #!/bin/bash
-            cd /root/repositories/thegioididong
             
-            echo "$(date): Starting deployment..." >> deploy.log
+            # Simple deployment
+            echo "Starting deployment..."
             
-            # Stop containers gracefully
-            echo "$(date): Stopping containers..." >> deploy.log
-            docker-compose down --timeout 30 >> deploy.log 2>&1
+            # Stop containers
+            docker-compose down --timeout 30
             
-            # Clean up old images and containers
-            echo "$(date): Cleaning up..." >> deploy.log
-            docker system prune -f >> deploy.log 2>&1
-            docker image prune -f >> deploy.log 2>&1
+            # Clean up
+            docker system prune -f
+            docker image prune -f
             
-            # Build all services
-            echo "$(date): Building all services..." >> deploy.log
-            docker-compose build --no-cache >> deploy.log 2>&1
+            # Build and start everything
+            docker-compose build --no-cache
+            docker-compose up -d
             
-            # Start infrastructure services first
-            echo "$(date): Starting infrastructure services..." >> deploy.log
-            docker-compose up -d postgres redis nats >> deploy.log 2>&1
-            
-            # Wait for infrastructure to be ready
-            echo "$(date): Waiting for infrastructure..." >> deploy.log
-            sleep 30
-            
-            # Start Elasticsearch (optional, can fail)
-            echo "$(date): Starting Elasticsearch..." >> deploy.log
-            docker-compose up -d elasticsearch >> deploy.log 2>&1 || echo "Elasticsearch failed to start, continuing..." >> deploy.log
-            sleep 15
-            
-            # Start backend
-            echo "$(date): Starting backend..." >> deploy.log
-            docker-compose up -d backend >> deploy.log 2>&1
-            
-            # Wait for backend to be ready
-            echo "$(date): Waiting for backend..." >> deploy.log
-            sleep 20
-            
-            # Test backend health
-            for i in {1..10}; do
-                if curl -f http://127.0.0.1:3001/api/v1/health >> deploy.log 2>&1; then
-                    echo "$(date): Backend is healthy" >> deploy.log
-                    break
-                fi
-                echo "$(date): Backend not ready, waiting... ($i/10)" >> deploy.log
-                sleep 10
-            done
-            
-            # Start frontend
-            echo "$(date): Starting frontend..." >> deploy.log
-            docker-compose up -d frontend >> deploy.log 2>&1
-            
-            # Start pgadmin
-            echo "$(date): Starting pgadmin..." >> deploy.log
-            docker-compose up -d pgadmin >> deploy.log 2>&1
-            
-            # Final status check
-            echo "$(date): Deployment complete!" >> deploy.log
-            echo "$(date): Container status:" >> deploy.log
-            docker-compose ps >> deploy.log 2>&1
-            
-            # System resource check
-            echo "$(date): System resources:" >> deploy.log
-            free -h >> deploy.log 2>&1
-            df -h >> deploy.log 2>&1
-            
-            # Create completion marker
-            touch deployment_complete.flag
-            echo "$(date): Deployment completed successfully" >> deploy.log
-            EOF
-            
-            chmod +x deploy.sh
-            
-            # Run deployment immediately (not in background)
-            echo "Starting immediate deployment..."
-            ./deploy.sh
+            echo "Deployment complete!"
+            docker-compose ps
