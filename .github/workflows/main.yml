@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: SSH Deploy
         uses: appleboy/ssh-action@master
@@ -15,6 +16,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: 22
+          timeout: 25m
           script: |
             cd /root/repositories/thegioididong
             # Remove any GitHub-injected extra headers that can break pulls on the VPS
@@ -30,8 +32,38 @@ jobs:
             git reset --hard origin/production
             git clean -fd
 
-            docker compose down
+            # Stop containers gracefully
+            docker compose down --timeout 30
+            
+            # Clean up old images and containers
+            docker system prune -f
+            
+            # Build with no cache
             docker compose build --no-cache
-            docker compose up -d
-
+            
+            # Start services in stages to avoid timeout
+            echo "Starting infrastructure services..."
+            docker compose up -d postgres redis nats elasticsearch
+            
+            # Wait for infrastructure to be healthy
+            echo "Waiting for infrastructure services to be ready..."
+            timeout 300 bash -c 'until docker compose ps | grep -E "(postgres|redis|elasticsearch)" | grep -q "healthy"; do sleep 5; echo "Waiting for services..."; done'
+            
+            # Start backend
+            echo "Starting backend service..."
+            docker compose up -d backend
+            
+            # Wait for backend to be healthy
+            echo "Waiting for backend to be ready..."
+            timeout 180 bash -c 'until docker compose ps backend | grep -q "healthy"; do sleep 5; echo "Waiting for backend..."; done'
+            
+            # Start frontend and pgadmin
+            echo "Starting frontend and pgadmin..."
+            docker compose up -d frontend pgadmin
+            
+            # Final status check
+            echo "Deployment complete. Container status:"
+            docker compose ps
+            
+            # Cleanup old images
             docker image prune -f
