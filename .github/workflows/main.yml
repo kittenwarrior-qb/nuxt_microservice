@@ -16,7 +16,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
-            cd /root/services/nuxt_microservice
+            cd /root/repositories/thegioididong
             # Remove any GitHub-injected extra headers that can break pulls on the VPS
             git config --global --unset-all http.https://github.com/.extraheader || true
             git config --system --unset-all http.https://github.com/.extraheader || true
@@ -31,7 +31,7 @@ jobs:
             git clean -fd
 
             docker-compose down
-            docker-compose build --no-cache
+            docker-compose  
             docker-compose up -d
 
             docker image prune -f
