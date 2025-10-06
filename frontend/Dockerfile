@@ -1,45 +1,53 @@
-# Multi-stage build for Nuxt 4 frontend
-FROM node:20.19.0-bookworm-slim AS base
+FROM node:20.19.0-alpine AS base
 
-# Install dependencies only when needed
 FROM base AS deps
-# On Debian-based images, glibc is available by default; no extra packages required
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-# Avoid running postinstall (nuxt prepare) before source is copied
-ENV NPM_CONFIG_IGNORE_SCRIPTS=true
-RUN npm ci && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --only=production --no-audit --no-fund && \
+    npm cache clean --force
 
-# Rebuild the source code only when needed
-FROM base AS builder
+FROM base AS build-deps
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund && \
+    npm cache clean --force
+
+FROM build-deps AS builder
+WORKDIR /app
+
 COPY . .
 
-# Build the application
-# Build runs scripts as needed (including nuxt prepare)
-RUN npm run build
+ENV NODE_ENV=production
+ENV NITRO_PRESET=node-server
+ENV NUXT_TELEMETRY_DISABLED=1
+RUN --mount=type=cache,target=/app/.nuxt \
+    --mount=type=cache,target=/app/node_modules/.cache \
+    npm run build
 
-# Production image, copy all the files and run nuxt
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NUXT_HOST=0.0.0.0
 ENV NUXT_PORT=3000
+ENV NITRO_PORT=3000
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nuxtjs
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nuxtjs -u 1001
 
-# Copy built application
-COPY --from=builder --chown=nuxtjs:nodejs /app/.output /app/.output
+COPY --from=deps --chown=nuxtjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./.output
+COPY --from=builder --chown=nuxtjs:nodejs /app/package.json ./package.json
 
 USER nuxtjs
 
 EXPOSE 3000
 
-# Start the application
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
 CMD ["node", ".output/server/index.mjs"]
