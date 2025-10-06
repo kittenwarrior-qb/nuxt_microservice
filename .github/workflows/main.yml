@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: SSH Deploy
         uses: appleboy/ssh-action@master
@@ -15,14 +16,18 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: 22
+          timeout: 25m
           script: |
             cd /root/repositories/thegioididong
+            
             # Remove any GitHub-injected extra headers that can break pulls on the VPS
             git config --global --unset-all http.https://github.com/.extraheader || true
             git config --system --unset-all http.https://github.com/.extraheader || true
             git config --local --unset-all http.https://github.com/.extraheader || true
+            
             # Mark repo as safe directory to avoid ownership warnings
-            git config --global --add safe.directory /root/services/nuxt_microservice || true
+            git config --global --add safe.directory /root/repositories/thegioididong || true
+            
             set -e
             git fetch --all --prune
             git checkout production || git checkout -b production
@@ -30,8 +35,29 @@ jobs:
             git reset --hard origin/production
             git clean -fd
 
+            # Install docker-compose if not exists
+            if ! command -v docker-compose &> /dev/null; then
+                echo "Installing docker-compose..."
+                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                chmod +x /usr/local/bin/docker-compose
+                ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+            fi
+
+            # Verify docker-compose installation
+            docker-compose --version
+
+            # Stop containers gracefully
             docker-compose down
-            docker-compose  
+            
+            # Build with no cache
+            docker-compose build --no-cache
+            
+            # Start services
             docker-compose up -d
 
+            # Cleanup old images
             docker image prune -f
+            
+            # Final status check
+            echo "Deployment complete. Container status:"
+            docker-compose ps
