@@ -19,23 +19,19 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/scripts:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
     networks:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tgdd"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: tgdd-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -45,139 +41,113 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   # NATS Message Broker
   nats:
     image: nats:2-alpine
     container_name: tgdd-nats
-    ports:
-      - "4222:4222"
-      - "8222:8222"
     networks:
       - tgdd-network
     restart: unless-stopped
 
-  # Elasticsearch Search Engine
+  # Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: tgdd-elasticsearch
     environment:
       - discovery.type=single-node
+      - cluster.name=tgdd-cluster
+      - node.name=tgdd-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enrollment.enabled=false
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
-      # Disable memory lock for low-memory servers
+      - http.cors.enabled=true
+      - http.cors.allow-origin="*"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-      - "9300:9300"
     networks:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 5
+      timeout: 60s
+      start_period: 60s
+      retries: 10
 
-  # Backend API
+  # Backend Service
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tgdd-backend
+    env_file:
+      - .env
+      - ./backend/.env
     environment:
       - NODE_ENV=production
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-password}
-      - DB_NAME=tgdd
-      - DB_DIALECT=postgres
-      - TRANSPORTER=nats://nats:4222
-      - CACHER=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-your-production-jwt-secret}
-      # CORS / Frontend origins (read by api.service.js & chat.service.js)
-      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136,http://tgddclone.duckdns.org:3000}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://tgddclone.duckdns.org:3000}
-      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
-      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
-      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
-      # Elasticsearch Configuration
-      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
-      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-products}
-      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME}
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
-      - SEARCH_SUGGEST_LIMIT=${SEARCH_SUGGEST_LIMIT:-8}
-      - MIN_SEARCH_LENGTH=${MIN_SEARCH_LENGTH:-2}
-      - SEARCH_CACHE_TTL=${SEARCH_CACHE_TTL:-300}
-      - PORT=3001
+      - API_BASE_URL=https://api.tgddclone.duckdns.org
+      - FRONTEND_URL=https://app.tgddclone.duckdns.org
+      - CORS_ORIGIN=https://app.tgddclone.duckdns.org
+      - FRONTEND_ORIGINS=https://app.tgddclone.duckdns.org
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nats:
-        condition: service_started
       elasticsearch:
         condition: service_healthy
-    command: >
-      sh -c "
-        npm start &
-        sleep 10 &&
-        node scripts/es-import.js &&
-        wait
-      "
     networks:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node healthcheck.js"]
-      interval: 15s
-      timeout: 5s
-      start_period: 20s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
 
-  # Frontend
+  # Frontend Service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: tgdd-frontend
+    env_file:
+      - .env
+      - ./frontend/.env
     environment:
-      # Use public origin (through nginx) so the browser never calls Docker service names
-      - NUXT_PUBLIC_API_BASE_URL=/api/v1
-      - NUXT_PUBLIC_BASE_URL=/
-      - NUXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}
-      - NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
-      - NUXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - NUXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
-      - NUXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
-      - NUXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID}
+      - NODE_ENV=production
+      - NUXT_PUBLIC_API_BASE_URL=https://api.tgddclone.duckdns.org/api/v1
+      - NUXT_PUBLIC_BASE_URL=https://app.tgddclone.duckdns.org
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - tgdd-network
     restart: unless-stopped
 
+  # PgAdmin
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: tgdd-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@thegioididong.com
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@tgddclone.duckdns.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     networks:
       - tgdd-network
     restart: unless-stopped
