@@ -7,8 +7,7 @@ RUN apk add --no-cache curl ca-certificates
 COPY package*.json ./
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --only=production --no-audit --no-fund && \
-    npm cache clean --force
+    npm ci --only=production --no-audit --no-fund
 
 COPY . .
 
