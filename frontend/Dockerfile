@@ -5,16 +5,14 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --only=production --no-audit --no-fund && \
-    npm cache clean --force
+    npm ci --only=production --no-audit --no-fund
 
 FROM base AS build-deps
 WORKDIR /app
 COPY package*.json ./
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund && \
-    npm cache clean --force
+    npm ci --no-audit --no-fund
 
 FROM build-deps AS builder
 WORKDIR /app
