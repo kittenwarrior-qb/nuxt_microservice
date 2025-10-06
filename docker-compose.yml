@@ -8,15 +8,14 @@ volumes:
   elasticsearch_data:
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: tgdd-postgres
-    env_file:
-      - .env
     environment:
-      - POSTGRES_DB=tgdd
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      POSTGRES_DB: tgdd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/scripts:/docker-entrypoint-initdb.d
@@ -27,10 +26,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Redis Cache
   redis:
@@ -45,10 +43,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # NATS Message Broker
   nats:
@@ -68,18 +65,8 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - xpack.security.enrollment.enabled=false
-      - cluster.name=tgdd-cluster
-      - node.name=tgdd-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - http.cors.enabled=true
-      - http.cors.allow-origin="*"
-      - action.destructive_requires_name=false
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      # Disable memory lock for low-memory servers
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
@@ -89,11 +76,10 @@ services:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=10s || exit 1"]
-      interval: 15s
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
       timeout: 10s
-      start_period: 120s
-      retries: 20
+      retries: 5
 
   # Backend API
   backend:
@@ -101,9 +87,33 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tgdd-backend
-    env_file:
-      - .env
-      - ./backend/.env
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=tgdd
+      - DB_DIALECT=postgres
+      - TRANSPORTER=nats://nats:4222
+      - CACHER=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-production-jwt-secret}
+      # CORS / Frontend origins (read by api.service.js & chat.service.js)
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136,http://tgddclone.duckdns.org:3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://tgddclone.duckdns.org:3000}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      # Elasticsearch Configuration
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-products}
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - SEARCH_SUGGEST_LIMIT=${SEARCH_SUGGEST_LIMIT:-8}
+      - MIN_SEARCH_LENGTH=${MIN_SEARCH_LENGTH:-2}
+      - SEARCH_CACHE_TTL=${SEARCH_CACHE_TTL:-300}
+      - PORT=3001
     ports:
       - "3001:3001"
     depends_on:
@@ -117,10 +127,8 @@ services:
         condition: service_healthy
     command: >
       sh -c "
-        echo 'Waiting for services to be ready...' &&
-        sleep 15 &&
         npm start &
-        sleep 20 &&
+        sleep 10 &&
         node scripts/es-import.js &&
         wait
       "
@@ -128,11 +136,11 @@ services:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "node healthcheck.js || exit 1"]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 10
+      test: ["CMD-SHELL", "node healthcheck.js"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
 
   # Frontend
   frontend:
@@ -140,9 +148,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: tgdd-frontend
-    env_file:
-      - .env
-      - ./frontend/.env
+    environment:
+      # Use public origin (through nginx) so the browser never calls Docker service names
+      - NUXT_PUBLIC_API_BASE_URL=/api/v1
+      - NUXT_PUBLIC_BASE_URL=/
+      - NUXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
+      - NUXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - NUXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+      - NUXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
+      - NUXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID}
     ports:
       - "3000:3000"
     depends_on:
@@ -151,22 +166,13 @@ services:
     networks:
       - tgdd-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 5
 
-  # PGAdmin
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: tgdd-pgadmin
-    env_file:
-      - .env
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: admin@thegioididong.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
       - "5050:80"
     depends_on:

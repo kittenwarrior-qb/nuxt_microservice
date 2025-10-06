@@ -60,48 +60,32 @@ module.exports = {
           if (cached) return cached;
         }
 
+        // Prefer Elasticsearch if configured
         if (this.es) {
           try {
-            const isShort = trimmed.length < 3;
-            const shouldClauses = [
-              { match_phrase_prefix: { name: { query: trimmed, slop: 0, max_expansions: 50, boost: 3 } } },
-              { prefix: { 'brand.keyword': trimmed.toLowerCase() } },
-              { prefix: { 'category.keyword': trimmed.toLowerCase() } },
-            ];
-
-            if (!isShort) {
-              shouldClauses.push({ wildcard: { name: { value: `*${trimmed.toLowerCase()}*`, boost: 0.5 } } });
-            }
-
-            const esResult = await this.es.search({
-              index: this.settings.elastic.index,
+            const index = this.settings.elastic.index;
+            const result = await this.es.search({
+              index,
               size: limit,
               query: {
-                bool: {
-                  should: shouldClauses,
-                  minimum_should_match: 1,
-                  filter: [
-                    { exists: { field: 'name' } }
-                  ]
-                }
-              }
+                multi_match: {
+                  query: trimmed,
+                  fields: ['name^3', 'brand^2', 'category'],
+                  type: 'bool_prefix',
+                },
+              },
+              _source: ['id', 'name', 'price', 'brand', 'category', 'img'],
             });
 
-            const hits = (esResult?.hits?.hits || []).map(hit => ({
-              id: hit._source.id,
-              name: hit._source.name,
-              price: hit._source.price,
-              brand: hit._source.brand || '',
-              category: hit._source.category || '',
-              img: hit._source.img
-            }));
-
-            return hits; 
+            const hits = result.hits?.hits || [];
+            return hits.map(h => ({ id: h._source.id, name: h._source.name, price: h._source.price, brand: h._source.brand, category: h._source.category, img: h._source.img }));
           } catch (err) {
             this.logger.error('Elasticsearch suggest error:', err);
+            // Fallback to DB if ES fails
           }
         }
 
+        // PostgreSQL fallback using simple optimized search
         const fallbackSql = `
           SELECT id, name, price, brand, category, img
           FROM products
