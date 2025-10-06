@@ -10,7 +10,6 @@ volumes:
   elasticsearch_data:
 
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: tgdd-postgres
