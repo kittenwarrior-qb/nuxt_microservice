@@ -11,6 +11,7 @@ const envOrigins = process.env.FRONTEND_ORIGINS
 const defaultOrigins = [
   process.env.FRONTEND_URL,
   process.env.CORS_ORIGIN,
+  "https://app.tgddclone.duckdns.org",
   "http://localhost:3000",
   "http://localhost:5173",
 ].filter(Boolean);
@@ -25,7 +26,21 @@ module.exports = {
     port: process.env.PORT || 3001,
     ip: "0.0.0.0",
     
-    use: [],
+    use: [
+      cors({
+        origin: (origin, callback) => {
+          // Allow no-origin requests (like curl or server-to-server)
+          if (!origin) return callback(null, true);
+          if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+          return callback(new Error(`Not allowed by CORS: ${origin}`));
+        },
+        credentials: process.env.CORS_CREDENTIALS === "true" || true,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+      })
+    ],
     
     routes: [
       {
@@ -93,22 +108,6 @@ module.exports = {
           "search.*"
         ],
         
-        use: [
-          cors({
-            origin: (origin, callback) => {
-              // Allow no-origin requests (like curl or server-to-server)
-              if (!origin) return callback(null, true);
-              if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-              }
-              return callback(new Error(`Not allowed by CORS: ${origin}`));
-            },
-            credentials: process.env.CORS_CREDENTIALS === "true" || true,
-            methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-          })
-        ],
-        
         mergeParams: true,
         
         authentication: false,
@@ -130,7 +129,15 @@ module.exports = {
           "POST /auth/register": "users.register",
           "POST /auth/login": "users.login",
           "POST /auth/firebase": "auth.verifyToken",
-          "GET /auth/me": "users.me"
+          "GET /auth/me": "users.me",
+          
+          // Product endpoints
+          "GET /products": "products.list",
+          "GET /products/flash-sale": "products.flashSale",
+          "GET /products/new": "products.newProducts",
+          "GET /products/search": "products.search",
+          "GET /products/categories": "products.categories",
+          "GET /products/:id": "products.get"
         },
         
         callingOptions: {},
