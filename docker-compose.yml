@@ -1,3 +1,5 @@
+version: "3.9"
+
 networks:
   tgdd-network:
     driver: bridge
@@ -12,10 +14,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: tgdd-postgres
-    environment:
-      POSTGRES_DB: tgdd
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    env_file:
+      - root.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/scripts:/docker-entrypoint-initdb.d
@@ -25,7 +25,7 @@ services:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,6 +34,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: tgdd-redis
+    env_file:
+      - root.env
     ports:
       - "6379:6379"
     volumes:
@@ -62,10 +64,8 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: tgdd-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+    env_file:
+      - root.env
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
@@ -86,31 +86,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tgdd-backend
-    environment:
-      - NODE_ENV=production
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-password}
-      - DB_NAME=tgdd
-      - DB_DIALECT=postgres
-      - TRANSPORTER=nats://nats:4222
-      - CACHER=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-your-production-jwt-secret}
-      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-http://172.236.138.136,http://tgddclone.duckdns.org:3000}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://tgddclone.duckdns.org:3000}
-      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
-      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
-      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
-      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
-      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-products}
-      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME}
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
-      - SEARCH_SUGGEST_LIMIT=${SEARCH_SUGGEST_LIMIT:-8}
-      - MIN_SEARCH_LENGTH=${MIN_SEARCH_LENGTH:-2}
-      - SEARCH_CACHE_TTL=${SEARCH_CACHE_TTL:-300}
-      - PORT=3001
+    env_file:
+      - backend.env
     ports:
       - "3001:3001"
     depends_on:
@@ -145,15 +122,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: tgdd-frontend
-    environment:
-      - NUXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
-      - NUXT_PUBLIC_BASE_URL=http://localhost:3001/
-      - NUXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}
-      - NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
-      - NUXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - NUXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
-      - NUXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
-      - NUXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID}
+    env_file:
+      - frontend.env
     ports:
       - "3000:3000"
     depends_on:
@@ -163,12 +133,12 @@ services:
       - tgdd-network
     restart: unless-stopped
 
+  # PGAdmin
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: tgdd-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@thegioididong.com
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    env_file:
+      - root.env
     ports:
       - "5050:80"
     depends_on:
