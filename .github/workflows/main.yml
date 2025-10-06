@@ -1,4 +1,4 @@
-name: Optimized Deployment
+name: Simple Deployment
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - name: SSH Deploy
         uses: appleboy/ssh-action@master
@@ -16,77 +15,23 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: 22
-          timeout: 40m
           script: |
-            cd /root/repositories/thegioididong
-            
-            # Git configuration and cleanup
+            cd /root/services/nuxt_microservice
+            # Remove any GitHub-injected extra headers that can break pulls on the VPS
             git config --global --unset-all http.https://github.com/.extraheader || true
             git config --system --unset-all http.https://github.com/.extraheader || true
             git config --local --unset-all http.https://github.com/.extraheader || true
-            git config --global --add safe.directory /root/repositories/thegioididong || true
-            
+            # Mark repo as safe directory to avoid ownership warnings
+            git config --global --add safe.directory /root/services/nuxt_microservice || true
             set -e
             git fetch --all --prune
             git checkout production || git checkout -b production
+            # Discard any local changes to ensure clean deployment
             git reset --hard origin/production
             git clean -fd
 
-            # Stop containers gracefully but keep volumes
-            echo "Stopping containers..."
-            docker compose down --timeout 30 --volumes=false
-            
-            # Enable Docker BuildKit for faster builds
-            export DOCKER_BUILDKIT=1
-            export COMPOSE_DOCKER_CLI_BUILD=1
-            
-            # Build with cache and parallel processing
-            echo "Building images with cache..."
-            docker compose build \
-              --parallel \
-              --build-arg BUILDKIT_INLINE_CACHE=1 \
-              --progress=plain
-            
-            # Start infrastructure services first
-            echo "Starting infrastructure services..."
-            docker compose up -d postgres redis nats
-            
-            # Wait for basic services (shorter timeout)
-            echo "Waiting for basic services..."
-            sleep 15
-            
-            # Start Elasticsearch separately (it takes longer)
-            echo "Starting Elasticsearch..."
-            docker compose up -d elasticsearch &
-            
-            # Start backend while ES is starting
-            echo "Starting backend..."
-            sleep 10
-            docker compose up -d backend
-            
-            # Start frontend and pgadmin
-            echo "Starting frontend and pgadmin..."
-            sleep 5
-            docker compose up -d frontend pgadmin
-            
-            # Quick status check
-            echo "Deployment initiated. Checking status..."
-            docker compose ps
-            
-            # Background health monitoring
-            echo "Monitoring service health in background..."
-            (
-              for i in {1..60}; do
-                if docker compose ps | grep -q "unhealthy\|exited"; then
-                  echo "Warning: Some services may have issues"
-                  docker compose ps
-                fi
-                sleep 5
-              done
-            ) &
-            
-            # Cleanup old images in background
-            docker image prune -f &
-            
-            echo "Deployment completed! Services are starting up..."
-            echo "Check logs with: docker compose logs -f [service_name]"
+            docker-compose down
+            docker-compose build --no-cache
+            docker-compose up -d
+
+            docker image prune -f
