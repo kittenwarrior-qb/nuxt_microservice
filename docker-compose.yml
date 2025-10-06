@@ -68,7 +68,18 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      - xpack.security.enrollment.enabled=false
+      - cluster.name=tgdd-cluster
+      - node.name=tgdd-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - http.cors.enabled=true
+      - http.cors.allow-origin="*"
+      - action.destructive_requires_name=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
@@ -78,10 +89,11 @@ services:
       - tgdd-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 5
+      timeout: 30s
+      start_period: 60s
+      retries: 10
 
   # Backend API
   backend:
