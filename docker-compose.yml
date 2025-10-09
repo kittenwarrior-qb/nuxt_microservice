@@ -15,7 +15,7 @@ services:
     environment:
       POSTGRES_DB: tgdd
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_PASSWORD: quocbui26042005
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/scripts:/docker-entrypoint-initdb.d
